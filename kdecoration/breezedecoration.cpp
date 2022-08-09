@@ -487,15 +487,15 @@ void Decoration::updateTitleBar()
     if (m_buttonBackgroundType == ButtonBackgroundType::FullHeight && !(m_internalSettings->drawBorderOnMaximizedWindows() && c->isMaximizedVertically())) {
         width = maximized ? c->width() : c->width() - m_scaledTitleBarLeftMargin - m_scaledTitleBarRightMargin;
         height = borderTop();
-        x = maximized ? 0 : m_scaledTitleBarLeftMargin;
-        y = 0;
+        x = maximized ?: m_scaledTitleBarLeftMargin;
+        y = c->height();
 
     } else {
         // for smaller circular buttons increase the resizable area
         width = maximized ? c->width() : c->width() - m_scaledTitleBarLeftMargin - m_scaledTitleBarRightMargin;
         height = maximized ? borderTop() : borderTop() - m_scaledTitleBarTopMargin;
         x = maximized ? 0 : m_scaledTitleBarLeftMargin;
-        y = maximized ? 0 : m_scaledTitleBarTopMargin;
+        y = maximized ? c->height() : c->height() + m_scaledTitleBarTopMargin;
     }
 
     setTitleBar(QRect(x, y, width, height));
@@ -682,20 +682,20 @@ void Decoration::recalculateBorders()
     // setScaledTitleBarTopBottomMargins();
 
     // left, right and bottom borders
+    const int top = (c->isShaded() || isTopEdge()) ? 0 : borderSize(true);
     const int left = isLeftEdge() ? 0 : borderSize();
     const int right = isRightEdge() ? 0 : borderSize();
-    const int bottom = (c->isShaded() || isBottomEdge()) ? 0 : borderSize(true);
 
-    int top = 0;
+    int bottom = 0;
     if (hideTitleBar())
-        top = bottom;
+        bottom = top;
     else {
         QFontMetrics fm(s->font());
-        top += qMax(fm.height(), m_smallButtonPaddedHeight);
+        bottom += qMax(fm.height(), m_smallButtonPaddedHeight);
 
         // padding below
-        top += titleBarSeparatorHeight();
-        top += (m_scaledTitleBarTopMargin + m_scaledTitleBarBottomMargin);
+        bottom += titleBarSeparatorHeight();
+        bottom += (m_scaledTitleBarTopMargin + m_scaledTitleBarBottomMargin);
     }
 
     setBorders(QMargins(left, top, right, bottom));
@@ -710,7 +710,7 @@ void Decoration::recalculateBorders()
     // Add extended resize handles for Full-sized Rectangle highlight as they cannot overlap with larger full-sized buttons
     if (m_buttonBackgroundType == ButtonBackgroundType::FullHeight) {
         if (!isMaximizedVertically())
-            extTop = extSize;
+            extBottom = extSize;
     }
 
     if (hasNoBorders()) {
@@ -719,7 +719,7 @@ void Decoration::recalculateBorders()
             extRight = extSize;
         }
         if (!isMaximizedVertically())
-            extBottom = extSize;
+            extTop = extSize;
 
     } else if (!isMaximizedHorizontally()) {
         if (hasNoSideBorders()) {
@@ -774,15 +774,15 @@ void Decoration::updateButtonsGeometry()
         buttonTopMargin -= int(qRound(qreal(internalSettings()->integratedRoundedRectangleBottomPadding()) * qreal(s->smallSpacing()) / 2.0));
 
     if (m_buttonBackgroundType == ButtonBackgroundType::FullHeight) {
-        bHeight = borderTop();
+        bHeight = borderBottom();
         bHeight -= titleBarSeparatorHeight();
         verticalIconOffset = buttonTopMargin + (captionHeight() - m_smallButtonPaddedHeight) / 2;
 
         buttonSpacingLeft = s->smallSpacing() * m_internalSettings->fullHeightButtonSpacingLeft();
         buttonSpacingRight = s->smallSpacing() * m_internalSettings->fullHeightButtonSpacingRight();
     } else {
-        bHeight = captionHeight() + (isTopEdge() ? buttonTopMargin : 0);
-        verticalIconOffset = (isTopEdge() ? buttonTopMargin : 0) + (captionHeight() - m_smallButtonPaddedHeight) / 2;
+        bHeight = captionHeight() + (isBottomEdge() ? buttonTopMargin : 0);
+        verticalIconOffset = (isBottomEdge() ? buttonTopMargin : 0) + (captionHeight() - m_smallButtonPaddedHeight) / 2;
 
         buttonSpacingLeft = s->smallSpacing() * m_internalSettings->buttonSpacingLeft();
         buttonSpacingRight = s->smallSpacing() * m_internalSettings->buttonSpacingRight();
@@ -943,7 +943,7 @@ void Decoration::paint(QPainter *painter, const QRect &repaintRegion)
         QPainterPath clipRect;
         // use clipRect for clipping away the top part
         if (!hideTitleBar()) {
-            clipRect.addRect(0, borderTop(), size().width(), size().height() - borderTop());
+            clipRect.addRect(0, 0, size().width(), size().height() - borderTop());
             // clip off the titlebar and draw bottom part
             QPainterPath windowPathMinusTitleBar = m_windowPath->intersected(clipRect);
             painter->drawPath(windowPathMinusTitleBar);
@@ -995,7 +995,7 @@ void Decoration::calculateWindowAndTitleBarShapes(const bool windowShapeOnly)
 
     if (!windowShapeOnly || c->isShaded()) {
         // set titleBar geometry and path
-        m_titleRect = QRect(QPoint(0, 0), QSize(size().width(), borderTop()));
+        m_titleRect = QRect(QPoint(0, size().height() - borderTop()), QSize(size().width(), borderTop()));
         m_titleBarPath->clear(); // clear the path for subsequent calls to this function
         if (isMaximized() || !s->isAlphaChannelSupported()) {
             m_titleBarPath->addRect(m_titleRect);
